@@ -3,6 +3,7 @@
 Flow: fetch from all sources -> filter -> compute freshness -> store in DB.
 """
 
+import time
 from typing import Optional
 
 from config import Config
@@ -29,11 +30,12 @@ def _fetch_from_all_sources(config: Config) -> list[Post]:
             all_posts.extend(posts)
         except Exception as e:
             print(f"[arctic_shift] Error fetching r/{subreddit}: {e}")
+        time.sleep(1)  # Rate limit between subreddits
 
     # Hacker News
     for query in config.hn_query_terms:
         try:
-            posts = fetch_hn_posts(query=query, config=config)
+            posts = fetch_hn_posts(query=query, days_back=config.lookback_window_days, config=config)
             all_posts.extend(posts)
         except Exception as e:
             print(f"[hn] Error fetching '{query}': {e}")
