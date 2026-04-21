@@ -1,0 +1,19 @@
+ Running It
+
+     # From /Users/jshum/Desktop/pain_point
+     source .venv/bin/activate
+
+     # Run all tests
+     pytest tests/ -v
+
+     # Run ingestion (fetches new posts, adds to DB)
+     PYTHONPATH=. python scripts/verify_ingestion.py
+
+     # Check DB state manually
+     PYTHONPATH=. python3 -c "
+     from pipeline.db import PostDB
+     db = PostDB('data/posts.db')
+     print('Total:', db.count())
+     print('By source:', db.count_by_source())
+     "
+
