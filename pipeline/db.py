@@ -64,5 +64,15 @@ class PostDB:
         )
         return {row["source"]: row["cnt"] for row in cursor.fetchall()}
 
+    def update_predictions(self, posts: list[Post]) -> None:
+        for post in posts:
+            if post.predicted_class is None:
+                continue
+            self._conn.execute(
+                "UPDATE posts SET predicted_class=?, confidence=? WHERE id=?",
+                (post.predicted_class, post.confidence, post.id),
+            )
+        self._conn.commit()
+
     def close(self):
         self._conn.close()
