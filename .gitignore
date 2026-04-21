@@ -1,0 +1,29 @@
+# Virtual environment
+.venv/
+
+# Environment variables
+.env
+
+# Data directories
+data/raw/
+data/processed/
+
+# Database
+dashboard/feedback.db
+*.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
