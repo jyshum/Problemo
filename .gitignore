@@ -28,3 +28,6 @@ build/
 # OS
 .DS_Store
 .worktrees/
+
+# Models
+classifier/models/
