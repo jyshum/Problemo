@@ -59,7 +59,7 @@ class Config:
     # === Models: LLM ===
     cluster_labeling_model: str = "claude-haiku-4-5-20251001"
     cluster_labeling_fallback: str = "gpt-5-nano"
-    dataset_labeling_model: str = "claude-sonnet-4-6-20250514"
+    dataset_labeling_model: str = "claude-sonnet-4-6"
 
     # === Clustering ===
     bertopic_min_topic_size: int = 10
