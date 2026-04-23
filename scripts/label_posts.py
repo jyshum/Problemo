@@ -62,7 +62,7 @@ def main():
             continue
 
         print(f"--- [{i+1}/{total}] ({row['source']}) ---")
-        print(row["text"][:600])
+        print(row["text"][:2000])
         print(f"\nURL: {row['url']}")
         print()
 

@@ -14,11 +14,38 @@ from config import Config
 from pipeline.db import PostDB
 from pipeline.ingestion.schema import Post
 
+REMOVED_MARKERS = {"[removed]", "[deleted]"}
+
+NOISE_TITLE_PREFIXES = (
+    "show hn:",
+    "show hn -",
+    "ask hn: anyone",
+    "ask hn: what do you",
+    "ask hn: how do you feel",
+    "ask hn: who is",
+    "ask hn: poll",
+)
+
+
+def _is_usable(post: Post) -> bool:
+    if post.text.strip() in REMOVED_MARKERS:
+        return False
+    if len(post.text.strip()) < 30:
+        return False
+    title_lower = post.text.lower()
+    if any(title_lower.startswith(prefix) for prefix in NOISE_TITLE_PREFIXES):
+        return False
+    return True
+
+
 KEYWORD_FILTERS: dict[str, list[str]] = {
-    "WORKFLOW_PAIN": ["manually", "hours", "spreadsheet", "every week", "no tool", "have to", "tedious"],
-    "TOOL_REQUEST": ["is there a", "is there an", "does anyone know", "someone should build", "looking for"],
-    "PRODUCT_COMPLAINT": ["broken", "missing", "crashes", "doesn't work", "terrible", "stopped working"],
+    "WORKFLOW_PAIN": ["manually", "spreadsheet", "every week", "no tool", "takes hours", "tedious", "time-consuming"],
+    "TOOL_REQUEST": ["is there a", "is there an app", "does anyone know of", "someone should build", "looking for a tool", "looking for software", "recommend a tool", "recommend an app", "any tools for", "any software for"],
+    "PRODUCT_COMPLAINT": ["broken", "missing feature", "crashes", "doesn't work", "terrible", "stopped working", "wish it had"],
 }
+
+# Subreddits most likely to contain actionable tech/business pain points
+SIGNAL_SUBREDDITS = {"smallbusiness", "Entrepreneur", "freelance", "webdev", "programming"}
 
 SAMPLE_COUNTS: dict[str, int] = {
     "WORKFLOW_PAIN": 50,
@@ -43,6 +70,7 @@ def sample_by_keywords(
     matched = [
         p for p in posts
         if p.id not in exclude_ids
+        and _is_usable(p)
         and any(kw.lower() in p.text.lower() for kw in keywords)
     ]
     random.seed(seed)
@@ -59,7 +87,7 @@ def sample_random(
     """Return n random posts, excluding any IDs in exclude_ids."""
     if exclude_ids is None:
         exclude_ids = set()
-    pool = [p for p in posts if p.id not in exclude_ids]
+    pool = [p for p in posts if p.id not in exclude_ids and _is_usable(p)]
     random.seed(seed)
     random.shuffle(pool)
     return pool[:n]
@@ -91,11 +119,21 @@ def main():
     sampled: list[Post] = []
     used_ids: set[str] = set()
 
+    # For signal classes, prefer posts from high-signal subreddits
+    signal_posts = [p for p in all_posts if p.subreddit in SIGNAL_SUBREDDITS]
+    hn_posts = [p for p in all_posts if p.source == "hn"]
+    signal_pool = signal_posts + hn_posts
+    print(f"  Signal pool (tech/business subreddits + HN): {len(signal_pool)} posts")
+
     for class_name in ["WORKFLOW_PAIN", "TOOL_REQUEST", "PRODUCT_COMPLAINT"]:
         keywords = KEYWORD_FILTERS[class_name]
         n = SAMPLE_COUNTS[class_name]
-        batch = sample_by_keywords(all_posts, keywords, n=n, exclude_ids=used_ids)
-        print(f"  {class_name}: {len(batch)} posts sampled (keyword-filtered)")
+        # Try signal pool first, fall back to all posts if not enough matches
+        batch = sample_by_keywords(signal_pool, keywords, n=n, exclude_ids=used_ids)
+        if len(batch) < n:
+            extra = sample_by_keywords(all_posts, keywords, n=n - len(batch), exclude_ids=used_ids | {p.id for p in batch})
+            batch += extra
+        print(f"  {class_name}: {len(batch)} posts sampled (keyword-filtered from signal pool)")
         sampled.extend(batch)
         used_ids.update(p.id for p in batch)
 
