@@ -1,0 +1,2 @@
+mpnet: Cohen's Kappa = 0.3765
+minilm: Cohen's Kappa = 0.4346
