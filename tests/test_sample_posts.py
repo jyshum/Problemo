@@ -35,7 +35,7 @@ def test_sample_by_keywords_returns_matching_posts():
 def test_sample_by_keywords_respects_n():
     from scripts.sample_posts import sample_by_keywords
 
-    posts = [make_post(str(i), "manually do this every week") for i in range(20)]
+    posts = [make_post(str(i), "I manually do this repetitive task every single week") for i in range(20)]
     result = sample_by_keywords(posts, ["manually"], n=5)
     assert len(result) == 5
 
@@ -53,7 +53,7 @@ def test_sample_by_keywords_excludes_ids():
 def test_sample_random_returns_n():
     from scripts.sample_posts import sample_random
 
-    posts = [make_post(str(i), "some text here") for i in range(50)]
+    posts = [make_post(str(i), "some sufficiently long text here that passes the filter") for i in range(50)]
     result = sample_random(posts, n=10)
     assert len(result) == 10
 
@@ -61,7 +61,7 @@ def test_sample_random_returns_n():
 def test_sample_random_excludes_ids():
     from scripts.sample_posts import sample_random
 
-    posts = [make_post(str(i), "some text here") for i in range(20)]
+    posts = [make_post(str(i), "some sufficiently long text here that passes the filter") for i in range(20)]
     result = sample_random(posts, n=15, exclude_ids={"0", "1", "2", "3", "4"})
     ids = {p.id for p in result}
     for excluded in ["0", "1", "2", "3", "4"]:
