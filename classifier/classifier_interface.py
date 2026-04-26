@@ -18,7 +18,7 @@ from sentence_transformers import SentenceTransformer
 
 from config import Config
 
-LABELS = ["WORKFLOW_PAIN", "TOOL_REQUEST", "PRODUCT_COMPLAINT", "NOISE"]
+LABELS = ["WORKFLOW_PAIN", "TOOL_REQUEST", "NOISE"]
 ID2LABEL = {i: l for i, l in enumerate(LABELS)}
 
 MODELS_DIR = Path("classifier/models")

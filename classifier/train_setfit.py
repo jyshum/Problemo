@@ -26,7 +26,7 @@ from sentence_transformers import SentenceTransformer
 
 from config import Config
 
-LABELS = ["WORKFLOW_PAIN", "TOOL_REQUEST", "PRODUCT_COMPLAINT", "NOISE"]
+LABELS = ["WORKFLOW_PAIN", "TOOL_REQUEST", "NOISE"]
 LABEL2ID = {l: i for i, l in enumerate(LABELS)}
 ID2LABEL = {i: l for i, l in enumerate(LABELS)}
 

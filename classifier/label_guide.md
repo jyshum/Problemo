@@ -9,21 +9,25 @@ you find during labeling.
 
 ### WORKFLOW_PAIN
 Person describes a repetitive task done manually or inefficiently,
-with no satisfying solution currently in place.
+with no satisfying solution currently in place. Also includes frustration
+with a specific named product where a feature is missing, broken, or
+worse than expected.
 
 **Signal phrases:** "every week I", "I manually", "takes hours",
 "still using spreadsheets", "no tool for", "wish there was a way to",
-"have to", "tedious", "time-consuming"
+"have to", "tedious", "time-consuming", "[product] is broken",
+"[product] is missing", "wish it had", "doesn't work", "terrible"
 
 **Positive examples:**
 - "Every Monday I spend 3 hours copying data from emails into a spreadsheet. There has to be a better way."
 - "I manually track all my client invoices in Excel. It takes forever and I always make mistakes."
 - "Our team still uses paper forms for patient intake. No digital solution exists that works for our workflow."
+- "Notion's table view has been broken for weeks and they haven't fixed it."
+- "Slack's search is terrible. I can never find old messages."
 
 **Negative examples (don't label as WORKFLOW_PAIN):**
 - Asking if a tool exists → TOOL_REQUEST
-- Complaining about a specific named product → PRODUCT_COMPLAINT
-- Generic venting with no workflow described → NOISE
+- Generic venting with no workflow or product frustration described → NOISE
 
 ---
 
@@ -42,25 +46,6 @@ requests that one be built.
 
 **Negative examples:**
 - Already describes a manual process without asking → WORKFLOW_PAIN
-- Complaining about a specific product → PRODUCT_COMPLAINT
-
----
-
-### PRODUCT_COMPLAINT
-Person is unhappy with a specific named existing product — a feature
-is missing, broken, or worse than expected.
-
-**Signal phrases:** [product name] + "broken", "missing", "wish it had",
-"doesn't work", "terrible", "stopped working", "used to work", "can't believe"
-
-**Positive examples:**
-- "Notion's table view has been broken for weeks and they haven't fixed it."
-- "QuickBooks is missing a basic feature to split invoices across projects."
-- "Slack's search is terrible. I can never find old messages."
-
-**Negative examples:**
-- Generic frustration without naming a product → WORKFLOW_PAIN or NOISE
-- Asking if another product exists instead → TOOL_REQUEST
 
 ---
 
@@ -82,8 +67,8 @@ news sharing, philosophical questions.
 | If the post... | Label |
 |---|---|
 | Describes a manual/inefficient process, no tool mentioned | WORKFLOW_PAIN |
+| Frustrated with a specific named product (feature missing/broken) | WORKFLOW_PAIN |
 | Asks whether a tool exists or requests one | TOOL_REQUEST |
-| Complains about a specific named product | PRODUCT_COMPLAINT |
 | Everything else | NOISE |
 
 ## Edge Cases
