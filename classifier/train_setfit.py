@@ -1,28 +1,26 @@
-"""Train SetFit-style classifiers on labeled.jsonl and write eval reports.
+"""Train real SetFit classifiers on labeled.jsonl and write eval reports.
 
-Encodes texts with pretrained sentence-transformer backbones,
-trains a logistic regression head on the embeddings, evaluates on
-a locked stratified test set.
+Uses SetFit contrastive fine-tuning (not frozen embeddings) to hit macro F1 >= 0.75.
+Trains two backbones sequentially on the same locked test set.
 
 Writes model artifacts to classifier/models/ and eval reports
 to classifier/eval_report/.
 
-Usage: PYTHONPATH=. .venv/bin/python classifier/train_setfit.py
+Usage: PYTHONPATH=. python classifier/train_setfit.py
 """
 
 import json
-import joblib
+import gc
 import warnings
 from pathlib import Path
 
 import matplotlib
-matplotlib.use("Agg")  # non-interactive backend for M2
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import numpy as np
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
 from sklearn.model_selection import StratifiedShuffleSplit
-from sentence_transformers import SentenceTransformer
+from datasets import Dataset
+from setfit import SetFitModel, Trainer, TrainingArguments
 
 from config import Config
 
@@ -37,11 +35,13 @@ EVAL_REPORT_DIR = Path("classifier/eval_report")
 
 
 def load_labeled_data(path: Path) -> tuple[list[str], list[str]]:
-    """Load labeled.jsonl → (texts, labels)."""
+    """Load labeled.jsonl → (texts, labels), skipping unknown labels."""
     texts, labels = [], []
     with open(path) as f:
         for line in f:
             row = json.loads(line)
+            if row["label"] not in LABELS:
+                continue
             texts.append(row["text"])
             labels.append(row["label"])
     return texts, labels
@@ -84,33 +84,53 @@ def train_and_evaluate(
     test_labels: list[str],
     model_short_name: str,
 ) -> dict:
-    """Encode with sentence-transformer, train logistic regression head, evaluate."""
+    """Fine-tune a real SetFit model via contrastive learning and evaluate."""
     print(f"\n=== Training {model_short_name} ({backbone}) ===")
 
-    encoder = SentenceTransformer(backbone)
+    train_dataset = Dataset.from_dict({
+        "text": train_texts,
+        "label": [LABEL2ID[l] for l in train_labels],
+    })
+    eval_dataset = Dataset.from_dict({
+        "text": test_texts,
+        "label": [LABEL2ID[l] for l in test_labels],
+    })
 
-    print("  Encoding train texts...")
-    train_embeddings = encoder.encode(train_texts, show_progress_bar=True, batch_size=32)
-    print("  Encoding test texts...")
-    test_embeddings = encoder.encode(test_texts, show_progress_bar=True, batch_size=32)
+    model = SetFitModel.from_pretrained(backbone, labels=LABELS)
 
-    train_label_ids = [LABEL2ID[l] for l in train_labels]
-    test_label_ids = [LABEL2ID[l] for l in test_labels]
+    args = TrainingArguments(
+        num_epochs=3,
+        num_iterations=20,
+        batch_size=8,
+        seed=42,
+    )
 
-    print("  Training logistic regression head...")
-    clf = LogisticRegression(max_iter=1000, random_state=42, C=1.0, class_weight="balanced")
-    clf.fit(train_embeddings, train_label_ids)
+    trainer = Trainer(
+        model=model,
+        args=args,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        metric="accuracy",
+    )
 
-    pred_label_ids = clf.predict(test_embeddings)
-    pred_proba = clf.predict_proba(test_embeddings)
-    pred_labels = [ID2LABEL[int(i)] for i in pred_label_ids]
+    trainer.train()
+
+    pred_ids = model.predict(test_texts)
+    pred_labels = [ID2LABEL[int(i)] for i in pred_ids]
 
     model_path = MODELS_DIR / f"setfit-{model_short_name}"
     model_path.mkdir(parents=True, exist_ok=True)
-    joblib.dump(clf, model_path / "head.joblib")
-    # Save backbone name for loading at inference
-    (model_path / "backbone.txt").write_text(backbone)
+    model.save_pretrained(str(model_path))
     print(f"  Model saved to {model_path}")
+
+    # Free GPU memory before next model
+    del model, trainer
+    gc.collect()
+    try:
+        import torch
+        torch.cuda.empty_cache()
+    except Exception:
+        pass
 
     return {
         "backbone": backbone,
@@ -130,25 +150,27 @@ def write_eval_reports(results: list[dict], test_texts: list[str]) -> None:
         pred = result["pred_labels"]
         true = result["true_labels"]
 
-        report_lines.append(f"\n=== {name} ===\n")
+        report_lines.append(f"\n=== {name} (SetFit fine-tuned) ===\n")
         report_lines.append(classification_report(true, pred, labels=LABELS))
 
         cm = confusion_matrix(true, pred, labels=LABELS)
         fig, ax = plt.subplots(figsize=(8, 6))
         disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=LABELS)
         disp.plot(ax=ax, xticks_rotation=30)
-        ax.set_title(f"Confusion Matrix — {name}")
+        ax.set_title(f"Confusion Matrix - {name} (SetFit fine-tuned)")
         fig.tight_layout()
         fig.savefig(EVAL_REPORT_DIR / f"confusion_matrix_{name}.png", dpi=150)
         plt.close(fig)
         print(f"Saved confusion matrix for {name}")
 
-    (EVAL_REPORT_DIR / "classification_report.txt").write_text("\n".join(report_lines))
+    (EVAL_REPORT_DIR / "classification_report.txt").write_text(
+        "\n".join(report_lines), encoding="utf-8"
+    )
     print(f"Saved {EVAL_REPORT_DIR / 'classification_report.txt'}")
 
     # Error analysis on primary model
     primary = results[0]
-    lines = [f"# Error Analysis\n\nModel: {primary['model_short_name']}\n\n"]
+    lines = [f"# Error Analysis\n\nModel: {primary['model_short_name']} (SetFit fine-tuned)\n\n"]
 
     for label in LABELS:
         fps = [
@@ -171,14 +193,15 @@ def write_eval_reports(results: list[dict], test_texts: list[str]) -> None:
             lines.append(f"- **Predicted: {pred}** | {text[:200]}\n")
         lines.append("\n")
 
-    (EVAL_REPORT_DIR / "error_analysis.md").write_text("".join(lines))
+    (EVAL_REPORT_DIR / "error_analysis.md").write_text("".join(lines), encoding="utf-8")
     print(f"Saved {EVAL_REPORT_DIR / 'error_analysis.md'}")
 
     kappa_path = EVAL_REPORT_DIR / "kappa_score.txt"
     if not kappa_path.exists():
         kappa_path.write_text(
             "Cohen's Kappa: not yet computed.\n"
-            "Run: PYTHONPATH=. .venv/bin/python classifier/evaluate.py --kappa\n"
+            "Run: PYTHONPATH=. python classifier/evaluate.py --kappa\n",
+            encoding="utf-8",
         )
 
 
@@ -193,7 +216,7 @@ def main():
 
     backbones = [
         (config.setfit_backbone, "mpnet"),
-        ("sentence-transformers/all-MiniLM-L6-v2", "minilm"),
+        ("nomic-ai/modernbert-embed-base", "modernbert"),
     ]
 
     results = []
