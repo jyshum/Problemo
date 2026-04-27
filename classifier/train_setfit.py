@@ -116,7 +116,11 @@ def train_and_evaluate(
     trainer.train()
 
     pred_ids = model.predict(test_texts)
-    pred_labels = [ID2LABEL[int(i)] for i in pred_ids]
+    # SetFit returns label strings directly or integer IDs depending on version
+    pred_labels = [
+        i if isinstance(i, str) else ID2LABEL[int(i)]
+        for i in pred_ids
+    ]
 
     model_path = MODELS_DIR / f"setfit-{model_short_name}"
     model_path.mkdir(parents=True, exist_ok=True)
