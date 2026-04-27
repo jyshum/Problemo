@@ -220,20 +220,38 @@ def main():
 
     backbones = [
         (config.setfit_backbone, "mpnet"),
-        ("nomic-ai/modernbert-embed-base", "modernbert"),
+        ("sentence-transformers/all-mpnet-base-v2", "mpnet-v2"),
     ]
 
     results = []
     for backbone, short_name in backbones:
-        result = train_and_evaluate(
-            backbone=backbone,
-            train_texts=train_texts,
-            train_labels=train_labels,
-            test_texts=test_texts,
-            test_labels=test_labels,
-            model_short_name=short_name,
-        )
-        results.append(result)
+        model_path = MODELS_DIR / f"setfit-{short_name}"
+        if model_path.exists():
+            print(f"\n=== Skipping {short_name} (already trained, loading saved model) ===")
+            from setfit import SetFitModel
+            model = SetFitModel.from_pretrained(str(model_path))
+            pred_ids = model.predict(test_texts)
+            pred_labels = [
+                i if isinstance(i, str) else ID2LABEL[int(i)]
+                for i in pred_ids
+            ]
+            results.append({
+                "backbone": backbone,
+                "model_short_name": short_name,
+                "pred_labels": pred_labels,
+                "true_labels": test_labels,
+            })
+            del model
+        else:
+            result = train_and_evaluate(
+                backbone=backbone,
+                train_texts=train_texts,
+                train_labels=train_labels,
+                test_texts=test_texts,
+                test_labels=test_labels,
+                model_short_name=short_name,
+            )
+            results.append(result)
 
     write_eval_reports(results, test_texts)
     print("\nTraining complete. Eval reports written to classifier/eval_report/")
